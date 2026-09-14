@@ -1,14 +1,15 @@
 packages: []
 lockfile: false
-onlyBuiltDependencies:
-  - "@karinjs/node-pty"
-  - "@karinjs/sqlite3-cjs"
-  - canvas
-  - classic-level
-  - protobufjs
-  - puppeteer
-  - sharp
-  - sqlite3
+allowBuilds:
+  "@karinjs/node-pty": true
+  "@karinjs/sqlite3-cjs": true
+  canvas: true
+  classic-level: true
+  protobufjs: true
+  puppeteer: true
+  sharp: true
+  sqlite3: true
+  esbuild: true
 publicHoistPattern:
   - "*sqlite3*"
   - "*express*"
