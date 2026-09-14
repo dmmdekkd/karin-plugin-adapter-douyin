@@ -1,0 +1,11 @@
+{
+  "accounts": [
+    {
+      "name": "主号",
+      "enable": true
+    }
+  ],
+  "receiverMode": "android_websocket",
+  "sendChannel": "http",
+  "skipMssdk": true
+}
