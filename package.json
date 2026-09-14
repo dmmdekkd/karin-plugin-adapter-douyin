@@ -4,13 +4,13 @@
   "author": "shijin",
   "type": "module",
   "description": "karin 抖音适配器",
-  "homepage": "https://github.com/KarinJS/karin",
+  "homepage": "https://github.com/dmmdekkd/karin-plugin-adapter-douyin#readme",
   "bugs": {
-    "url": "https://github.com/KarinJS/karin/issues"
+    "url": "https://github.com/dmmdekkd/karin-plugin-adapter-douyin/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KarinJS/karin.git"
+    "url": "git+https://github.com/dmmdekkd/karin-plugin-adapter-douyin.git"
   },
   "scripts": {
     "app": "node dist/app.js",
