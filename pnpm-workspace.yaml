@@ -1,0 +1,14 @@
+packages: []
+lockfile: false
+onlyBuiltDependencies:
+  - "@karinjs/node-pty"
+  - "@karinjs/sqlite3-cjs"
+  - canvas
+  - classic-level
+  - protobufjs
+  - puppeteer
+  - sharp
+  - sqlite3
+publicHoistPattern:
+  - "*sqlite3*"
+  - "*express*"
