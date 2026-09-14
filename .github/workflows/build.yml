@@ -39,7 +39,7 @@ on:
     types: [opened, reopened, synchronize]
 
 env:
-  APP_NAME: karin-plugin-adapter-wxoc
+  APP_NAME: karin-plugin-adapter-douyin
 
 permissions:
   contents: write
@@ -377,7 +377,7 @@ jobs:
     steps:
       - name: 🔄 同步到国内镜像源
         run: |
-          curl --max-time 60 --connect-timeout 10 -X PUT "https://registry-direct.npmmirror.com/-/package/karin-plugin-adapter-wxoc/syncs"
+          curl --max-time 60 --connect-timeout 10 -X PUT "https://registry-direct.npmmirror.com/-/package/karin-plugin-adapter-douyin/syncs"
 
   # 构建分支同步
   build-branch-sync:

@@ -120,11 +120,7 @@ build
 .verdaccio-storage.json
 
 # Optional VS Code files
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+.vscode/
 *.code-workspace
 
 # Optional JetBrains Rider files
@@ -135,3 +131,6 @@ build
 # karin runtime data & local secrets
 @karinjs
 development.env
+
+# test-only app
+src/apps/avatar-test.ts

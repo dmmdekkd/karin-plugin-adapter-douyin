@@ -1,4 +1,4 @@
-name: 🚀 功能建议
+﻿name: 🚀 功能建议
 description: 提议有明确场景、受益范围和可验收结果的新能力或改进
 title: 'Feature: '
 labels: ['enhancement']
@@ -10,14 +10,14 @@ body:
         功能建议应回答：**谁在什么场景遇到了什么限制、现有方案为什么不够、期望最终得到什么结果**。单纯填写“支持一下”“加个开关”“能不能做……”通常不足以进入需求评审。
         > 强烈推荐阅读 [《提问的智慧》](https://github.com/ryanhanwu/How-To-Ask-Questions-The-Smart-Way)、[《如何向开源社区提问题》](https://github.com/seajs/seajs/issues/545)、[《如何有效地报告 Bug》](http://www.chiark.greenend.org.uk/%7Esgtatham/bugs-cn.html) 和 [《如何向开源项目提交无法解答的问题》](https://zhuanlan.zhihu.com/p/25795393)。清楚的问题定义和使用场景，比直接指定实现方式更有助于评估需求。
         > [!IMPORTANT]
-        > 个人配置求助、安装咨询和一次性需求请前往 [Discussions](https://github.com/dmmdekkd/karin-plugin-adapter-wxoc/discussions)。微信个人号协议本身不支持的能力（如主动添加好友、群聊管理），也请先提供可行性依据。
+        > 个人配置求助、安装咨询和一次性需求请前往 [Discussions](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/discussions)。微信个人号协议本身不支持的能力（如主动添加好友、群聊管理），也请先提供可行性依据。
   - type: checkboxes
     id: preflight
     attributes:
       label: 提交前确认
       description: 请确认该建议值得进入公开需求池。
       options:
-        - label: '我已查阅项目文档，并搜索现有 Issues 和 Discussions，确认没有相同建议 <!-- wxoc-issue-form: feature-v2 -->'
+        - label: '我已查阅项目文档，并搜索现有 Issues 和 Discussions，确认没有相同建议 <!-- douyin-issue-form: feature-v2 -->'
           required: true
         - label: 这不是仅针对我个人环境的配置、安装或排障请求
           required: true

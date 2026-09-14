@@ -1,5 +1,5 @@
 'use strict'
-const QUALITY_COMMENT_MARKER = '<!-- wxoc-issue-quality-check -->'
+const QUALITY_COMMENT_MARKER = '<!-- douyin-issue-quality-check -->'
 const GENERIC_ANSWERS = new Set(
   [
     'no response',
@@ -65,7 +65,7 @@ const ISSUE_RULES = {
  * @param {string} body Issue 正文
  * @returns {Map<string, string>} 标题到字段内容的映射
  */
-function parseSections(body) {
+function parseSections (body) {
   const sections = new Map()
   const headingPattern = /^###\s+(.+?)\s*$/gm
   const headings = [...String(body || '').matchAll(headingPattern)]
@@ -85,7 +85,7 @@ function parseSections(body) {
  * @param {{ title?: string, body?: string, labels?: Array<string | { name?: string }> }} issue GitHub Issue 数据
  * @returns {{ kind: 'bug' | 'feature' | null, problems: string[] }} 检查结果
  */
-function validateIssue(issue) {
+function validateIssue (issue) {
   const kind = detectIssueKind(issue)
   if (!kind) return { kind: null, problems: [] }
   const problems = []
@@ -122,7 +122,7 @@ function validateIssue(issue) {
  * @param {string[]} problems 检出的问题
  * @returns {string} 评论正文
  */
-function buildQualityComment(login, problems) {
+function buildQualityComment (login, problems) {
   return `${QUALITY_COMMENT_MARKER}
 ### Issue 信息完整性检查未通过
 @${login}，自动检查发现当前内容还不足以进入问题或需求评审：
@@ -133,7 +133,7 @@ ${problems.map((problem) => `- ${problem}`).join('\n')}
 > 提交前可参考：[《提问的智慧》](https://github.com/ryanhanwu/How-To-Ask-Questions-The-Smart-Way) · [《如何向开源社区提问题》](https://github.com/seajs/seajs/issues/545) · [《如何有效地报告 Bug》](http://www.chiark.greenend.org.uk/%7Esgtatham/bugs-cn.html)
 `
 }
-function detectIssueKind(issue) {
+function detectIssueKind (issue) {
   const labels = (issue.labels || [])
     .map((label) => (typeof label === 'string' ? label : label.name || ''))
     .map((label) => label.toLowerCase())
@@ -142,22 +142,22 @@ function detectIssueKind(issue) {
   return null
 }
 // 旧版 Issue 在后续编辑时不应被新规则误判；新表单同时用隐藏标记和独有字段识别。
-function isCurrentForm(kind, body, sections) {
-  if (body.includes(`<!-- wxoc-issue-form: ${kind}-v2 -->`)) return true
+function isCurrentForm (kind, body, sections) {
+  if (body.includes(`<!-- douyin-issue-form: ${kind}-v2 -->`)) return true
   if (kind === 'bug') return sections.has('问题类型') && sections.has('运行环境') && sections.has('复现频率')
   return sections.has('建议类型') && sections.has('需求背景') && sections.has('预期受益范围')
 }
-function stripTitlePrefix(title) {
+function stripTitlePrefix (title) {
   return String(title)
     .replace(/^\s*(?:\[?\s*🐛?\s*bug\s*\]?|\[?\s*🚀?\s*feature(?:\s+request)?\s*\]?)\s*[:：-]?\s*/i, '')
     .trim()
 }
-function isMeaningful(answer, minimumLength, allowAttachment = false) {
+function isMeaningful (answer, minimumLength, allowAttachment = false) {
   if (!answer || isGenericAnswer(answer)) return false
   if (allowAttachment && hasAttachment(answer)) return true
   return meaningfulLength(answer) >= minimumLength
 }
-function meaningfulLength(value) {
+function meaningfulLength (value) {
   return [
     ...String(value)
       .replace(/<!--[^]*?-->/g, ' ')
@@ -168,21 +168,21 @@ function meaningfulLength(value) {
       .replace(/\s+/g, '')
   ].length
 }
-function normalizeComparable(value) {
+function normalizeComparable (value) {
   return String(value || '')
     .toLowerCase()
     .replace(/_no response_/g, 'no response')
     .replace(/[^\p{L}\p{N}]+/gu, '')
 }
-function isGenericAnswer(value) {
+function isGenericAnswer (value) {
   const normalized = normalizeComparable(value)
   if (!normalized || GENERIC_ANSWERS.has(normalized)) return true
   return /^(?:见|如|看)?(?:上|下)?图(?:所示)?$|^(?:报错|出错|有问题|无法使用|解析失败|不工作|坏了)$/u.test(normalized)
 }
-function hasAttachment(value) {
+function hasAttachment (value) {
   return /github\.com\/user-attachments|!\[[^\]]*\]\([^)]*\)|<img\b|```|\.(?:log|txt|json|zip)(?:\)|\s|$)/i.test(value)
 }
-function findDuplicateSections(sections, names) {
+function findDuplicateSections (sections, names) {
   const seen = new Map()
   const duplicates = new Set()
   for (const name of names) {
@@ -199,7 +199,7 @@ function findDuplicateSections(sections, names) {
   }
   return [...duplicates]
 }
-function validateEnvironment(environment, problems) {
+function validateEnvironment (environment, problems) {
   const fields = [
     { name: '插件版本', aliases: ['插件版本'], version: true },
     { name: 'Karin 版本', aliases: ['karin 版本'], version: true },
@@ -219,7 +219,7 @@ function validateEnvironment(environment, problems) {
     }
   }
 }
-function findEnvironmentValue(environment, aliases) {
+function findEnvironmentValue (environment, aliases) {
   for (const line of String(environment).split(/\r?\n/)) {
     const normalizedLine = line.toLowerCase()
     if (!aliases.some((alias) => normalizedLine.includes(alias))) continue

@@ -1,4 +1,4 @@
-'use strict'
+﻿'use strict'
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const { parseSections, validateIssue } = require('./issue-quality.cjs')
@@ -43,7 +43,7 @@ ${bugConfirmation}
 ### 相关配置
 accounts[0].nickname: 微信ClawBot\ndownloadFile: url
 ### 运行环境
-- 插件版本：1.0.0\n- Karin 版本：1.17.0\n- Node.js 版本：24.13.0\n- 操作系统：Ubuntu 24.04\n- 适配器 / 协议端：karin-plugin-adapter-wxoc / 微信 ilink\n- 安装方式（插件市场 / npm / Git / Docker）：npm
+- 插件版本：1.0.0\n- Karin 版本：1.17.0\n- Node.js 版本：24.13.0\n- 操作系统：Ubuntu 24.04\n- 适配器 / 协议端：karin-plugin-adapter-douyin / 微信 ilink\n- 安装方式（插件市场 / npm / Git / Docker）：npm
 ### 复现频率
 必现（每次都能复现）`
   assert.deepEqual(validateIssue({ title: 'Bug: 发送图片消息上传失败', body, labels: [{ name: 'bug' }] }).problems, [])
