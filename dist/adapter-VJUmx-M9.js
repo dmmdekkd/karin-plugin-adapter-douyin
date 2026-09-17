@@ -1,8 +1,9 @@
 import { dir } from "./dir.js";
+import { n as onConfigChange, r as upsertAccount, t as config } from "./config-hl-8_-zX.js";
 import { createRequire } from "node:module";
 import path, { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AdapterBase, contactFriend, contactGroup, copyConfigSync, createFriendDecreaseNotice, createFriendIncreaseNotice, createFriendMessage, createGroupAdminChangedNotice, createGroupApplyRequest, createGroupMemberAddNotice, createGroupMemberDelNotice, createGroupMessage, createGroupMessageReactionNotice, createGroupRecallNotice, createPrivateApplyRequest, createPrivateRecallNotice, filesByExt, logger, registerBot, requireFileSync, segment, senderFriend, senderGroup, unregisterBot, watch } from "node-karin";
+import { AdapterBase, contactFriend, contactGroup, createFriendDecreaseNotice, createFriendIncreaseNotice, createFriendMessage, createGroupAdminChangedNotice, createGroupApplyRequest, createGroupMemberAddNotice, createGroupMemberDelNotice, createGroupMessage, createGroupMessageReactionNotice, createGroupRecallNotice, createPrivateApplyRequest, createPrivateRecallNotice, hooks, logger, registerBot, requireFileSync, segment, senderFriend, senderGroup, unregisterBot } from "node-karin";
 import fs, { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import os from "node:os";
@@ -4813,6 +4814,30 @@ async function modifyReaction(ctx, deviceId, options) {
 		statusMsg: String(decoded["errorDesc"] ?? "")
 	};
 }
+/** 会话标记已读：cmd=2002 mark_conversation_read（对齐 native rawMarkConversationRead，body oneof tag 604） */
+async function markConversationRead(ctx, deviceId, options) {
+	const send = async (endpoint) => ctx.transport.sendCookieProto(2002, options.inboxType ?? 1, endpoint, { markConversationRead: {
+		conversationId: options.conversationId,
+		conversationShortId: LONG$1.fromString(options.conversationShortId || "0"),
+		conversationType: options.conversationType ?? 1,
+		readMessageIndex: LONG$1.fromString(options.readMessageIndex ?? "0"),
+		readMessageIndexV2: LONG$1.fromString(options.readMessageIndexV2 ?? "0"),
+		convUnreadCount: LONG$1.fromString("0"),
+		totalUnreadCount: LONG$1.fromString("0"),
+		readBadgeCount: 0,
+		serverMessageId: LONG$1.fromString(options.serverMessageId ?? "0"),
+		ticket: ""
+	} }, deviceId);
+	let decoded = await send("/v1/conversation/mark_read");
+	if (Number(decoded["statusCode"] ?? 0) !== 0 && Number(decoded["statusCode"] ?? 0) !== 1) {
+		decoded = await send("/v3/conversation/mark_read");
+	}
+	const envelopeStatus = Number(decoded["statusCode"] ?? 0);
+	return {
+		statusCode: envelopeStatus === 1 ? 0 : envelopeStatus,
+		statusMsg: String(decoded["errorDesc"] ?? "")
+	};
+}
 /** cmd=702, /v1/message/recall — 撤回已投递消息 */
 async function recall$1(ctx, deviceId, options) {
 	const decoded = await ctx.transport.sendCookieProto(702, options.inboxType ?? 0, "/v1/message/recall", { recallMessage: {
@@ -6483,6 +6508,10 @@ var ImClient = class {
 	modifyReaction(item) {
 		return modifyReaction(this.inboxCtx, this.deviceId, item);
 	}
+	/** 会话标记已读（cmd=2002 mark_conversation_read） */
+	markRead(item) {
+		return markConversationRead(this.inboxCtx, this.deviceId, item);
+	}
 	uploadImage(data) {
 		return this.uploader.uploadImage(data);
 	}
@@ -6539,49 +6568,6 @@ var ImClient = class {
 };
 
 //#endregion
-//#region src/utils/config.ts
-/** 默认配置 */
-const defConfig = {
-	accounts: [{
-		name: "主号",
-		enable: true
-	}],
-	receiverMode: "android_websocket",
-	skipMssdk: true
-};
-/**
-* @description 初始化配置文件
-*/
-copyConfigSync(dir.defConfigDir, dir.ConfigDir, [".json"]);
-/**
-* @description 读取配置
-*/
-const config = () => {
-	try {
-		const cfg = requireFileSync(`${dir.ConfigDir}/config.json`);
-		return {
-			...defConfig,
-			...cfg
-		};
-	} catch {
-		return defConfig;
-	}
-};
-/**
-* @description 监听配置文件
-*/
-setTimeout(() => {
-	const list = filesByExt(dir.ConfigDir, ".json", "abs");
-	list.forEach((file) => watch(file, (old, now) => {
-		logger.info([
-			"[douyin] 检测到配置文件更新",
-			`旧数据: ${old}`,
-			`新数据: ${now}`
-		].join("\n"));
-	}));
-}, 2e3);
-
-//#endregion
 //#region src/api/account.ts
 /** 构建适配器级账号管理器 */
 function createAccountManager() {
@@ -6630,7 +6616,7 @@ function createAccountManager() {
 		const disabled = new Set(config().accounts.filter((a) => a.enable === false).map((a) => a.name ?? ""));
 		for (const record of store.list()) {
 			if (!record.session.cookies?.trim()) continue;
-			if (disabled.has(record.platformUid) || disabled.has(String(record.userData?.name ?? ""))) continue;
+			if (disabled.size > 0 && [...disabled].some((d) => matchName(record, d))) continue;
 			const numericUid = record.userData?.user_id_str;
 			const platformUid = numericUid ?? record.platformUid;
 			const deviceId = store.ensureDeviceId(record.platformUid);
@@ -6665,6 +6651,8 @@ function createAccountManager() {
 		const record = store.load(session.platformUid);
 		const acc = build(session.platformUid, { cookies: session.cookies }, recordName(record));
 		accounts.set(session.platformUid, acc);
+		const name = recordName(record);
+		if (name) upsertAccount(name);
 		return acc;
 	};
 	const logout = (platformUid) => {
@@ -6672,12 +6660,45 @@ function createAccountManager() {
 		accounts.delete(platformUid);
 		store.remove(platformUid);
 	};
+	/** 账号 name 是否匹配本地会话（restore 停用判定同源逻辑） */
+	const matchName = (record, name) => record.screenName === name || String(record.userData?.name ?? "") === name;
+	/**
+	* @description 配置变更后应用账号启用状态（配置立即生效）
+	* - enable=true：按昵称从本地会话重建账号（无会话则警告并返回 undefined）
+	* - enable=false：下线账号但保留本地会话，重启或重新启用时恢复
+	*/
+	const applyEnable = async (name, enable) => {
+		if (!name) return undefined;
+		if (enable) {
+			const record = store.list().find((r) => r.session.cookies?.trim() && matchName(r, name));
+			if (!record) {
+				logger.warn(`[douyin] 启用账号失败，未找到本地会话: ${name}（请先扫码登录）`);
+				return undefined;
+			}
+			const numericUid = record.userData?.user_id_str;
+			const platformUid = numericUid ?? record.platformUid;
+			const deviceId = store.ensureDeviceId(record.platformUid);
+			const acc = build(platformUid, {
+				...record.session,
+				deviceId
+			}, recordName(record));
+			accounts.set(platformUid, acc);
+			return acc;
+		}
+		const acc = [...accounts.values()].find((a) => a.config.name === name);
+		if (acc) {
+			acc.client.stop();
+			accounts.delete(acc.platformUid);
+		}
+		return undefined;
+	};
 	return {
 		store,
 		accounts,
 		restore,
 		loginByQr,
-		logout
+		logout,
+		applyEnable
 	};
 }
 
@@ -7645,6 +7666,40 @@ async function sendKarinElements(account, contact, elements) {
 }
 
 //#endregion
+//#region src/adapter/autoRead.ts
+let registered = false;
+/**
+* 注册「匹配到相应插件自动已读」全局钩子（幂等，仅注册一次）。
+* 消息事件被任一插件匹配（eventCall）时即标记该会话已读，不阻塞插件执行。
+*/
+function setupAutoRead() {
+	if (registered) return;
+	registered = true;
+	hooks.eventCall((e, _plugin, next) => {
+		if (e.event === "message" && config().autoReadOnMatch) {
+			const bot = e.bot;
+			if (bot?.ctx?.client) void autoReadConversation(bot, e.contact, e.time);
+		}
+		next();
+	}, { priority: 100 });
+}
+async function autoReadConversation(bot, contact, time) {
+	try {
+		const address = await resolveAddress(bot.ctx, contact);
+		if (!address) return;
+		const result = await bot.ctx.client.markRead({
+			...address,
+			readMessageIndex: String(Math.floor(Number(time) || 0) * 1e6)
+		});
+		if (result.statusCode !== 0) {
+			logger.warn(`[douyin] 自动已读失败: statusCode=${result.statusCode} ${result.statusMsg}`);
+		}
+	} catch (err) {
+		logger.debug(`[douyin] 自动已读异常: ${err instanceof Error ? err.message : String(err)}`);
+	}
+}
+
+//#endregion
 //#region src/adapter/login.ts
 /** 扫码登录并注册适配器（供指令层调用） */
 async function loginByQr(options = {}) {
@@ -8180,12 +8235,12 @@ async function createBot(ctx) {
 	ctx.client.on("notice", (ev) => dispatchNotice(bot, ev));
 	ctx.client.on("request", (ev) => dispatchRequest(bot, ev));
 	ctx.client.on("reconnecting", () => logger.debug(`[douyin][${ctx.platformUid}] WS 重连中`));
-	ctx.client.on("close", () => logger.warn(`[douyin][${ctx.platformUid}] WS 连接关闭`));
+	ctx.client.on("close", () => logger.debug(`[douyin][${ctx.platformUid}] WS 连接关闭`));
 	bots.set(ctx.platformUid, bot);
 	bot.adapter.index = registerBot("webSocketClient", bot);
 	void warmNickCache(bot);
 	await ctx.client.start();
-	logger.info(`[douyin] 账号 ${ctx.platformUid}(${ctx.config.name || "未命名"}) 已上线`);
+	logger.debug(`[douyin] 账号 ${ctx.platformUid}(${ctx.config.name || "未命名"}) 已上线`);
 	return bot;
 }
 /** 卸载 bot：断开连接并从 karin 注销 */
@@ -8193,7 +8248,7 @@ async function destroyBot(bot) {
 	bots.delete(bot.ctx.platformUid);
 	bot.ctx.client.stop();
 	unregisterBot("selfId", bot.account.selfId);
-	logger.info(`[douyin] 账号 ${bot.ctx.platformUid} 已卸载`);
+	logger.debug(`[douyin] 账号 ${bot.ctx.platformUid} 已卸载`);
 }
 /** 账号下线：卸载 bot（保留本地会话，重启后自动恢复） */
 async function logoutBot(platformUid) {
@@ -8204,8 +8259,44 @@ async function logoutBot(platformUid) {
 function getBots() {
 	return [...bots.values()];
 }
+/**
+* @description 对比新旧配置中账号启用状态，变更时立即停用/启用对应 bot（配置立即生效）
+*/
+async function applyAccountEnable(oldCfg, newCfg) {
+	const m = getAccountManager();
+	const oldMap = new Map((oldCfg.accounts || []).map((a) => [a.name ?? "", a.enable !== false]));
+	const newMap = new Map((newCfg.accounts || []).map((a) => [a.name ?? "", a.enable !== false]));
+	for (const [name, enable] of newMap) {
+		if (!name || oldMap.get(name) === enable) continue;
+		if (enable) {
+			if (getBots().some((b) => b.ctx.config.name === name)) {
+				await m.applyEnable(name, true);
+				continue;
+			}
+			const acc = await m.applyEnable(name, true);
+			if (acc) {
+				await createBot(acc).catch((err) => logger.error(`[douyin] 启用账号失败 ${name}: ${err instanceof Error ? err.message : String(err)}`));
+			}
+		} else {
+			const bot = getBots().find((b) => b.ctx.config.name === name);
+			if (bot) await destroyBot(bot);
+			await m.applyEnable(name, false);
+		}
+	}
+}
+/**
+* @description 注册配置变更监听：账号启用/停用保存后立即生效（幂等）
+* @remarks autoReadOnMatch 每次消息实时读取配置，本身即热生效，无需处理
+*/
+function setupConfigHotApply() {
+	onConfigChange((oldCfg, nowCfg) => {
+		void applyAccountEnable(oldCfg, nowCfg);
+	});
+}
 /** 启动适配器：恢复配置中启用的账号并注册 */
 async function initAdapter() {
+	setupAutoRead();
+	setupConfigHotApply();
 	const m = getAccountManager();
 	await m.restore();
 	await Promise.all([...m.accounts.values()].map((ctx) => createBot(ctx)));

@@ -1,4 +1,4 @@
-import { i as loginByQr, r as logoutBot, t as getBots } from "../adapter-DiA-vGJo.js";
+import { i as loginByQr, r as logoutBot, t as getBots } from "../adapter-VJUmx-M9.js";
 import karin, { logger, segment } from "node-karin";
 import QRCode from "qrcode";
 

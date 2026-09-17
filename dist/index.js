@@ -1,5 +1,5 @@
 import { dir } from "./dir.js";
-import { n as initAdapter } from "./adapter-DiA-vGJo.js";
+import { n as initAdapter } from "./adapter-VJUmx-M9.js";
 import { logger } from "node-karin";
 
 //#region src/index.ts
