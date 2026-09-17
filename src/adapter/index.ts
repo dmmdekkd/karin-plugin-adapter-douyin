@@ -1,4 +1,4 @@
-﻿import { AdapterBase, registerBot, unregisterBot, logger, segment, contactFriend } from 'node-karin'
+import { AdapterBase, registerBot, unregisterBot, logger, segment, contactFriend } from 'node-karin'
 import type {
   AdapterType,
   Contact,
@@ -14,7 +14,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { dir } from '@/dir'
 import { requireFileSync } from 'node-karin'
-import type { DouyinAccount } from '@/types'
+import type { Config, DouyinAccount } from '@/types'
+import { onConfigChange } from '@/utils/config'
 import { createAccountManager } from '@/api/account'
 import type { AccountManager } from '@/api/account'
 import * as apiMessage from '@/api/message'
@@ -26,6 +27,7 @@ import { dispatchNotice } from './notice'
 import { dispatchRequest } from './request'
 import { sendKarinElements } from './send'
 import { resolveAddress, loadForwardNodes } from './convert'
+import { setupAutoRead } from './autoRead'
 import { warmNickCache, locateSecUid, cachedNick, resolveNick, applyProfiles } from './nick'
 import { fetchDesktopSelfProfile } from '@/core/auth'
 import { fetchUserProfiles, cacheUserProfile, cachedAvatar as cachedUserProfileAvatar } from '@/api/profile'
@@ -443,13 +445,13 @@ export async function createBot (ctx: DouyinAccount): Promise<AdapterDouyin> {
   ctx.client.on('notice', ev => dispatchNotice(bot, ev))
   ctx.client.on('request', ev => dispatchRequest(bot, ev))
   ctx.client.on('reconnecting', () => logger.debug(`[douyin][${ctx.platformUid}] WS 重连中`))
-  ctx.client.on('close', () => logger.warn(`[douyin][${ctx.platformUid}] WS 连接关闭`))
+  ctx.client.on('close', () => logger.debug(`[douyin][${ctx.platformUid}] WS 连接关闭`))
 
   bots.set(ctx.platformUid, bot)
   bot.adapter.index = registerBot('webSocketClient', bot)
   void warmNickCache(bot)
   await ctx.client.start()
-  logger.info(`[douyin] 账号 ${ctx.platformUid}(${ctx.config.name || '未命名'}) 已上线`)
+  logger.debug(`[douyin] 账号 ${ctx.platformUid}(${ctx.config.name || '未命名'}) 已上线`)
   return bot
 }
 
@@ -458,7 +460,7 @@ export async function destroyBot (bot: AdapterDouyin): Promise<void> {
   bots.delete(bot.ctx.platformUid)
   bot.ctx.client.stop()
   unregisterBot('selfId', bot.account.selfId)
-  logger.info(`[douyin] 账号 ${bot.ctx.platformUid} 已卸载`)
+  logger.debug(`[douyin] 账号 ${bot.ctx.platformUid} 已卸载`)
 }
 
 /** 账号下线：卸载 bot（保留本地会话，重启后自动恢复） */
@@ -472,8 +474,49 @@ export function getBots (): AdapterDouyin[] {
   return [...bots.values()]
 }
 
+/**
+ * @description 对比新旧配置中账号启用状态，变更时立即停用/启用对应 bot（配置立即生效）
+ */
+async function applyAccountEnable (oldCfg: Config, newCfg: Config): Promise<void> {
+  const m = getAccountManager()
+  const oldMap = new Map((oldCfg.accounts || []).map(a => [a.name ?? '', a.enable !== false]))
+  const newMap = new Map((newCfg.accounts || []).map(a => [a.name ?? '', a.enable !== false]))
+  for (const [name, enable] of newMap) {
+    if (!name || oldMap.get(name) === enable) continue
+    if (enable) {
+      // 已在线的账号（如扫码登录刚创建）无需重建，仅确保管理器持有
+      if (getBots().some(b => b.ctx.config.name === name)) {
+        await m.applyEnable(name, true)
+        continue
+      }
+      const acc = await m.applyEnable(name, true)
+      if (acc) {
+        await createBot(acc).catch(err => logger.error(
+          `[douyin] 启用账号失败 ${name}: ${err instanceof Error ? err.message : String(err)}`,
+        ))
+      }
+    } else {
+      const bot = getBots().find(b => b.ctx.config.name === name)
+      if (bot) await destroyBot(bot)
+      await m.applyEnable(name, false)
+    }
+  }
+}
+
+/**
+ * @description 注册配置变更监听：账号启用/停用保存后立即生效（幂等）
+ * @remarks autoReadOnMatch 每次消息实时读取配置，本身即热生效，无需处理
+ */
+export function setupConfigHotApply (): void {
+  onConfigChange((oldCfg, nowCfg) => {
+    void applyAccountEnable(oldCfg, nowCfg)
+  })
+}
+
 /** 启动适配器：恢复配置中启用的账号并注册 */
 export async function initAdapter (): Promise<void> {
+  setupAutoRead()
+  setupConfigHotApply()
   const m = getAccountManager()
   await m.restore()
   await Promise.all([...m.accounts.values()].map(ctx => createBot(ctx)))

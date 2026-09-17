@@ -1,6 +1,3 @@
-/** 接收通道 */
-export type ReceiverMode = 'android_websocket' | 'im_websocket' | 'im_http_poll'
-
 /** 账号配置 */
 export interface AccountConfig {
   /** 账号备注名 */
@@ -13,8 +10,6 @@ export interface AccountConfig {
 export interface Config {
   /** 账号列表 */
   accounts: AccountConfig[]
-  /** 接收通道，默认 android_websocket */
-  receiverMode?: ReceiverMode
-  /** 跳过 msToken 预热 */
-  skipMssdk?: boolean
+  /** 匹配到相应插件时自动已读（消息被任一插件处理即标记会话已读），默认 false */
+  autoReadOnMatch?: boolean
 }

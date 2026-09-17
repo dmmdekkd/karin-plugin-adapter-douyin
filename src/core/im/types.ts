@@ -139,6 +139,16 @@ export interface RecallItem extends ConversationAddress {
   serverMessageId: string
 }
 
+/** 会话标记已读（cmd=2002 mark_conversation_read，对齐 native rawMarkConversationRead） */
+export interface MarkReadItem extends ConversationAddress {
+  /** 已读位置：read_message_index（proto field 4，取消息 createTime 微秒时间戳） */
+  readMessageIndex?: string
+  /** 已读位置 v2（read_message_index_v2，proto field 7，可选） */
+  readMessageIndexV2?: string
+  /** 已读的消息 id（server_message_id，proto field 10，可选） */
+  serverMessageId?: string
+}
+
 export interface RecallResult {
   statusCode: number
   statusMsg: string

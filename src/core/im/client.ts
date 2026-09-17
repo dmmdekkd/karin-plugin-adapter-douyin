@@ -1,4 +1,4 @@
-﻿import type { DouyinHttp } from '../http/client.js'
+import type { DouyinHttp } from '../http/client.js'
 import { logger } from 'node-karin'
 import { AndroidFrontierWs } from './protocol/index.js'
 import { decodeWireTree } from './protocol/index.js'
@@ -20,6 +20,7 @@ import type {
   GroupJoinRequestInfo,
   GroupMemberInfo,
   InboundMessage,
+  MarkReadItem,
   ModifyReactionItem,
   NoticeEvent,
   RecallItem,
@@ -223,6 +224,11 @@ export class ImClient {
   /** 消息表情回应（cmd=705 set_property，emoji 为抖音 skey 文本键） */
   modifyReaction (item: ModifyReactionItem): Promise<{ statusCode: number; statusMsg: string }> {
     return inbox.modifyReaction(this.inboxCtx, this.deviceId, item)
+  }
+
+  /** 会话标记已读（cmd=2002 mark_conversation_read） */
+  markRead (item: MarkReadItem): Promise<{ statusCode: number; statusMsg: string }> {
+    return inbox.markConversationRead(this.inboxCtx, this.deviceId, item)
   }
 
   /* -- 上传 ------------------------------------------------------------- */

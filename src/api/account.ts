@@ -8,8 +8,9 @@ import {
 } from '@/core/auth'
 import { DESKTOP_LOGIN_USER_AGENT } from '@/core/sign/constants'
 import { ImClient } from '@/core/im'
-import { config } from '@/utils/config'
+import { config, upsertAccount } from '@/utils/config'
 import { dir } from '@/dir'
+import { logger } from 'node-karin'
 import { join } from 'node:path'
 import type { DouyinAccount, AccountMap } from '@/types'
 
@@ -23,6 +24,8 @@ export interface AccountManager {
   loginByQr: (options?: QrLoginOptions & { onQr?: (info: QrCodeInfo) => void }) => Promise<DouyinAccount>
   /** 下线：关闭连接并删除本地会话 */
   logout: (platformUid: string) => void
+  /** 应用账号启用状态：enable=true 时按昵称从本地会话构建并返回账号（无会话返回 undefined），false 时下线保留会话 */
+  applyEnable: (name: string, enable: boolean) => Promise<DouyinAccount | undefined>
 }
 
 /** 构建适配器级账号管理器 */
@@ -68,13 +71,13 @@ export function createAccountManager (): AccountManager {
   }
 
   const restore = async (): Promise<void> => {
-    // 落盘 key = platformUid；config 中 enable=false 的账号跳过
+    // 落盘 key = platformUid；config 中 enable=false 的账号跳过（按昵称匹配）
     const disabled = new Set(
       config().accounts.filter(a => a.enable === false).map(a => a.name ?? ''),
     )
     for (const record of store.list()) {
       if (!record.session.cookies?.trim()) continue
-      if (disabled.has(record.platformUid) || disabled.has(String(record.userData?.name ?? ''))) continue
+      if (disabled.size > 0 && [...disabled].some(d => matchName(record, d))) continue
       // 修正历史落盘的 hash 形态 platformUid（frontier 握手要求数字 uid）
       const numericUid = (record.userData as { user_id_str?: string } | undefined)?.user_id_str
       const platformUid = numericUid ?? record.platformUid
@@ -122,6 +125,9 @@ export function createAccountManager (): AccountManager {
     const record = store.load(session.platformUid)
     const acc = build(session.platformUid, { cookies: session.cookies }, recordName(record))
     accounts.set(session.platformUid, acc)
+    // 扫码登录后自动生成账号配置（name 取屏幕昵称）
+    const name = recordName(record)
+    if (name) upsertAccount(name)
     return acc
   }
 
@@ -131,5 +137,38 @@ export function createAccountManager (): AccountManager {
     store.remove(platformUid)
   }
 
-  return { store, accounts, restore, loginByQr, logout }
+  /** 账号 name 是否匹配本地会话（restore 停用判定同源逻辑） */
+  const matchName = (record: AccountRecord, name: string): boolean =>
+    record.screenName === name ||
+    String((record.userData as { name?: string } | undefined)?.name ?? '') === name
+
+  /**
+   * @description 配置变更后应用账号启用状态（配置立即生效）
+   * - enable=true：按昵称从本地会话重建账号（无会话则警告并返回 undefined）
+   * - enable=false：下线账号但保留本地会话，重启或重新启用时恢复
+   */
+  const applyEnable = async (name: string, enable: boolean): Promise<DouyinAccount | undefined> => {
+    if (!name) return undefined
+    if (enable) {
+      const record = store.list().find(r => r.session.cookies?.trim() && matchName(r, name))
+      if (!record) {
+        logger.warn(`[douyin] 启用账号失败，未找到本地会话: ${name}（请先扫码登录）`)
+        return undefined
+      }
+      const numericUid = (record.userData as { user_id_str?: string } | undefined)?.user_id_str
+      const platformUid = numericUid ?? record.platformUid
+      const deviceId = store.ensureDeviceId(record.platformUid)
+      const acc = build(platformUid, { ...record.session, deviceId }, recordName(record))
+      accounts.set(platformUid, acc)
+      return acc
+    }
+    const acc = [...accounts.values()].find(a => a.config.name === name)
+    if (acc) {
+      acc.client.stop()
+      accounts.delete(acc.platformUid)
+    }
+    return undefined
+  }
+
+  return { store, accounts, restore, loginByQr, logout, applyEnable }
 }

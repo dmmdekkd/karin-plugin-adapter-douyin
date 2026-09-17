@@ -1,5 +1,5 @@
 export type {
-  AccountConfig, Config, ReceiverMode,
+  AccountConfig, Config,
 } from './config.js'
 
 export type {
