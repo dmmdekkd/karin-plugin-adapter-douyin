@@ -872,9 +872,16 @@ export async function createBot (ctx: DouyinAccount): Promise<AdapterDouyin> {
   })
 
   bots.set(ctx.platformUid, bot)
-  bot.adapter.index = registerBot('webSocketClient', bot)
   manualStop.delete(ctx.platformUid)
   await ctx.bot.start()
+  // cookie 有效性校验：SDK start 仅在未传 userId 时才自检，这里主动校验，ck 失效则不注册 bot
+  const info = await ctx.bot.user.self().catch(() => undefined)
+  if (!info?.uid) {
+    await ctx.bot.stop()
+    bots.delete(ctx.platformUid)
+    throw new Error(`Cookie 已失效，请重新扫码登录（${ctx.config.name || ctx.platformUid}）`)
+  }
+  bot.adapter.index = registerBot('webSocketClient', bot)
   // im 活跃心跳上报（登录后打一次；对齐参考插件 L1150，防连接静默掉线）
   ctx.bot.user.heartbeat().catch(err => logger.debug(
     `[douyin] 心跳上报失败: ${err instanceof Error ? err.message : String(err)}`
@@ -952,7 +959,14 @@ export async function initAdapter (): Promise<void> {
   loadContactCache()
   const m = getAccountManager()
   await m.restore()
-  await Promise.all([...m.accounts.values()].map(ctx => createBot(ctx)))
+  // 逐个注册：单个账号 cookie 失效不影响其他账号上线
+  await Promise.all([...m.accounts.values()].map(async ctx => {
+    try {
+      await createBot(ctx)
+    } catch (err) {
+      logger.error(`[douyin] 账号初始化失败: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }))
 }
 
 /** 扫码登录并注册适配器（供指令层调用） */
