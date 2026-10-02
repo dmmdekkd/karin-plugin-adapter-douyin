@@ -82,14 +82,9 @@ setTimeout(() => {
   }))
 }, 2000)
 
-/** @description 计算新旧配置的变更摘要（人类可读） */
-function diffConfig (oldCfg: Config, newCfg: Config): string[] {
+/** @description 计算账号启用状态变更摘要（新增/变更/移除） */
+function diffAccounts (oldMap: Map<string, boolean>, newMap: Map<string, boolean>): string[] {
   const items: string[] = []
-  if (oldCfg.autoReadOnMatch !== newCfg.autoReadOnMatch) {
-    items.push(`匹配自动已读 ${oldCfg.autoReadOnMatch ? '开启' : '关闭'}→${newCfg.autoReadOnMatch ? '开启' : '关闭'}`)
-  }
-  const oldMap = new Map<string, boolean>((oldCfg.accounts || []).map(a => [a.name ?? '', a.enable !== false]))
-  const newMap = new Map<string, boolean>((newCfg.accounts || []).map(a => [a.name ?? '', a.enable !== false]))
   for (const [name, enable] of newMap) {
     if (!name) continue
     const prev = oldMap.get(name)
@@ -101,5 +96,17 @@ function diffConfig (oldCfg: Config, newCfg: Config): string[] {
   for (const name of oldMap.keys()) {
     if (name && !newMap.has(name)) items.push(`移除账号「${name}」`)
   }
+  return items
+}
+
+/** @description 计算新旧配置的变更摘要（人类可读） */
+function diffConfig (oldCfg: Config, newCfg: Config): string[] {
+  const items: string[] = []
+  if (oldCfg.autoReadOnMatch !== newCfg.autoReadOnMatch) {
+    items.push(`匹配自动已读 ${oldCfg.autoReadOnMatch ? '开启' : '关闭'}→${newCfg.autoReadOnMatch ? '开启' : '关闭'}`)
+  }
+  const oldMap = new Map<string, boolean>((oldCfg.accounts || []).map(a => [a.name ?? '', a.enable !== false]))
+  const newMap = new Map<string, boolean>((newCfg.accounts || []).map(a => [a.name ?? '', a.enable !== false]))
+  items.push(...diffAccounts(oldMap, newMap))
   return items
 }

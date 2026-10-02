@@ -3,5 +3,5 @@ export type {
 } from './config.js'
 
 export type {
-  DouyinAccount, AccountMap, ResolvedAddress, ImClientEventMap,
+  DouyinAccount, AccountMap,
 } from './adapter.js'

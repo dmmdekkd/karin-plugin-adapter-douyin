@@ -1,5 +1,5 @@
 import karin, { restartDirect } from 'node-karin'
-import { autoCheck, checkUpdate, performUpdate } from '@/core/update'
+import { autoCheck, checkUpdate, performUpdate } from '@/utils/update'
 import { dir } from '@/dir'
 
 /** 自动更新定时任务 每日 04:00 检查 Karin 启动时注册 */

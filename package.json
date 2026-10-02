@@ -22,6 +22,7 @@
   "dependencies": {
     "@karinjs/plugin-shotium": "^0.3.2",
     "@ys7zts/karin-plugin-nekostatus": "^1.4.13",
+    "douyin.ts": "0.2.1",
     "karin-plugin-botweb": "^1.0.15",
     "karin-plugin-qbot": "^1.0.11",
     "protobufjs": "^8.8.0",

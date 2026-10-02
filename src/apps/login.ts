@@ -1,136 +1,114 @@
 /**
- * #抖音登录 / #抖音验证 指令
+ * #抖音bot登录 交互式登录
  *
- * 仅主人可用。流程：
- * 1. 回复提示 → 获取二维码并推送图片
- * 2. 扫码确认；若触发短信二次验证，回复「#抖音验证 验证码」提交
- * 3. 成功后自动落盘会话并注册 bot
+ * 仅主人可用。登录方式固定为 qr 扫码：
+ * - qr：推送二维码图片 → 手机扫码确认（若触发短信/密码二次验证，直接发送验证码/密码即可）
+ *
+ * 交互式输入由全局 hook 监听消费「裸消息」（白名单同一会话的主人），
+ * 完全不走命令方式。
+ *
+ * 登录成功后自动落盘会话并注册 bot，并回复成功提示。
  */
-import karin, { segment, logger } from 'node-karin'
-import type { Elements } from 'node-karin'
+import karin, { hooks, segment, logger } from 'node-karin'
 import QRCode from 'qrcode'
-import { loginByQr, getBots, logoutBot } from '@/adapter'
+import { login } from '@/adapter'
 
-/** 互斥锁：避免并发扫码 */
+/** 互斥锁：避免并发登录 */
 let busy = false
 
-/** 等待用户输入短信验证码的回调 */
+/** 发起登录的会话（peer + 发起人） */
+let loginFrom: { peer: string; userId: string | number } | undefined
+
+/** 扫码二次验证（手机号 MFA / 密码 MFA）等待的回调 */
 let mfaWaiter: ((code: string) => void) | undefined
 
-export const douyinLogin = karin.command(
-  /^#(?:抖音登录|douyinlogin)$/i,
-  async (e) => {
-    if (busy) {
-      await e.reply('已有扫码登录在进行中，请稍候再试')
-      return
-    }
-    busy = true
+/**
+ * 全局监听：登录等待期间直接消费「裸消息」作为输入（同一会话的主人）。
+ *
+ * node-karin 的消息分发不走 EventEmitter，必须通过 hooks.message 钩子接收；
+ * 该钩子在命令系统之前执行，且必须调用 next() 放行无关消息。
+ * 命中扫码二次验证等待输入时主动中断（不调用 next()），
+ * 避免裸消息继续进入命令系统被其他插件误处理。
+ */
+hooks.message((e, next) => {
+  if (!busy || !loginFrom) return next()
+  const sameUser = String(loginFrom.userId) === String(e.sender?.userId)
+  const samePeer = loginFrom.peer === e.contact?.peer
+  if (!sameUser || !samePeer) return next()
+  const input = e.msg.trim()
+  if (!input) return next()
+  // 消费扫码二次验证等待器
+  const waiter = mfaWaiter
+  if (!waiter) return next()
+  mfaWaiter = undefined
+  waiter(input)
+})
 
-    try {
-      await e.reply('请使用抖音 APP 扫描二维码完成登录（2 分钟内有效）：')
-      const acc = await loginByQr({
-        onQr: async (info) => {
-          // console 适配器：直接在终端打印 ASCII 二维码
-          if (e.bot.adapter.name === '@karinjs/console') {
-            const terminal = await QRCode.toString(info.qrcodeIndexUrl ?? info.token, { type: 'terminal', small: true })
-            logger.info(`\n${terminal}\n请使用抖音 APP 扫码登录`)
-            return
-          }
-          const elements: Elements[] = [segment.image(info.qrcodeBase64)]
-          if (info.qrcodeIndexUrl) elements.push(segment.text(`或在浏览器打开链接扫码：${info.qrcodeIndexUrl}`))
-          Promise.resolve(e.reply(elements)).catch(err => logger.warn('[douyin] 推送二维码失败:', err))
-        },
-        onStatus: (status) => {
-          if (status === 'scanned') {
-            Promise.resolve(e.reply('已扫码，请在手机上确认登录')).catch(() => { })
-          } else if (status !== 'new' && status !== 'verifying' && status !== 'verified' && status !== 'confirmed' && status !== 'expired') {
-            // 自定义提示文本（如上行短信指引）
-            Promise.resolve(e.reply(status)).catch(() => { })
-          }
-        },
-        onVerifyUrl: (url) => {
-          Promise.resolve(e.reply(
-            `触发登录安全验证，请在浏览器打开链接完成（5 分钟内有效）：\n${url}\n若服务部署在远程，请将 127.0.0.1 替换为服务器地址`,
-          )).catch(() => { })
-        },
-        onMfa: async ({ maskedMobile, kind }) => {
-          const prompt = kind === 'password'
-            ? '触发密码二次验证，请回复「#抖音验证 账号密码」（5 分钟内有效）'
-            : `触发二次验证，验证码已发送至安全手机 ${maskedMobile ?? ''}，请回复「#抖音验证 验证码」（5 分钟内有效）`
-          await e.reply(prompt)
-          return new Promise<string>((resolve, reject) => {
-            const timer = setTimeout(() => {
-              if (mfaWaiter === resolve) mfaWaiter = undefined
-              reject(new Error(kind === 'password' ? '等待密码输入超时' : '等待验证码输入超时'))
-            }, 5 * 60_000)
-            mfaWaiter = (code) => {
-              clearTimeout(timer)
-              resolve(code)
-            }
-          })
-        },
-      })
-      await e.reply(`抖音账号 ${acc.platformUid}${acc.config.name ? `(${acc.config.name})` : ''} 登录成功`)
-    } catch (err) {
-      logger.error('[douyin] 扫码登录失败:', err)
-      await e.reply(`扫码登录失败：${err instanceof Error ? err.message : '详见服务端日志'}`)
-    } finally {
-      busy = false
-      mfaWaiter = undefined
-    }
-  },
-  {
-    name: 'douyin:login',
-    permission: 'master',
-    authFailMsg: '#抖音登录 仅限主人使用',
-  },
-)
+export const douyinLogin = karin.command(/^#(?:抖音bot登录)$/i, async (e) => {
+  if (busy) {
+    await e.reply('已有登录在进行中，请稍候再试')
+    return
+  }
+  busy = true
+  mfaWaiter = undefined
+  loginFrom = { peer: e.contact.peer, userId: e.sender.userId }
 
-/** 提交扫码二次验证（短信验证码或账号密码） */
-export const douyinVerify = karin.command(
-  /^#(?:抖音验证|douyinverify)\s+(\S+)$/i,
-  async (e) => {
-    if (!mfaWaiter) {
-      await e.reply('当前没有等待输入的扫码二次验证')
-      return
+  try {
+    let name = ''
+
+    // 二维码推送：控制台适配器打印机终端码，其余推送图片到聊天
+    const pushQr = async (info: { url: string; base64?: string }): Promise<void> => {
+      if (e.bot.adapter.name === '@karinjs/console') {
+        const terminal = await QRCode.toString(info.url, {
+          type: 'terminal',
+          small: true,
+          margin: 0,
+          errorCorrectionLevel: 'L',
+        })
+        logger.info(`\n${terminal}\n请使用抖音 APP 扫码登录`)
+        return
+      }
+      if (!info.base64) throw new Error('未收到二维码图片')
+      await e.reply([segment.image(info.base64)])
     }
-    const waiter = mfaWaiter
+    // qr：扫码登录（对齐 douyin-im beginLogin 桌面流程）
+    const ctx = await login({
+      onQr: pushQr,
+      onStatus: async (status) => {
+        if (!['new', 'scanned', 'verifying', 'verified', 'confirmed', 'expired'].includes(status)) await e.reply(status)
+      },
+      onMfa: async ({ maskedMobile, kind }) => {
+        const prompt = kind === 'password'
+          ? '触发密码验证，请发送密码'
+          : `验证码已发至 ${maskedMobile ?? '安全手机'}，请发送验证码`
+        await e.reply(prompt)
+        return new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            if (mfaWaiter === resolve) mfaWaiter = undefined
+            reject(new Error(kind === 'password' ? '等待密码输入超时' : '等待验证码输入超时'))
+          }, 5 * 60_000)
+          mfaWaiter = (code) => {
+            clearTimeout(timer)
+            resolve(code)
+          }
+        })
+      },
+    })
+    name = ctx.config.name || ctx.platformUid
+
+    await e.reply(`抖音登录成功：${name}`)
+  } catch (err) {
+    logger.error('[douyin] 登录失败:', err)
+    await e.reply(`登录失败：${err instanceof Error ? err.message : '未知错误'}`)
+  } finally {
+    busy = false
+    loginFrom = undefined
     mfaWaiter = undefined
-    waiter(e.msg.match(/^#(?:抖音验证|douyinverify)\s+(\S+)$/i)?.[1] ?? '')
-    await e.reply('验证输入已提交，请稍候…')
-  },
-  {
-    name: 'douyin:verify',
-    permission: 'master',
-    authFailMsg: '#抖音验证 仅限主人使用',
-  },
-)
-
-const LOGOUT_RE = /^#(?:抖音下线|douyinlogout)(?:\s+(\S+))?$/i
-
-/** 下线账号并卸载 bot（不带参数时下线全部） */
-export const douyinLogout = karin.command(
-  LOGOUT_RE,
-  async (e) => {
-    const target = e.msg.match(LOGOUT_RE)?.[1]
-    const online = getBots()
-    if (!online.length) {
-      await e.reply('当前没有在线的抖音账号')
-      return
-    }
-    const targets = target
-      ? online.filter(b => b.ctx.platformUid === target || b.account.name === target)
-      : online
-    if (!targets.length) {
-      await e.reply(`未找到账号 ${target}，在线账号: ${online.map(b => b.account.name || b.ctx.platformUid).join(', ')}`)
-      return
-    }
-    for (const bot of targets) await logoutBot(bot.ctx.platformUid)
-    await e.reply(`已下线: ${targets.map(b => b.account.name || b.ctx.platformUid).join(', ')}（会话已保留，重启后自动恢复）`)
-  },
-  {
-    name: 'douyin:logout',
-    permission: 'master',
-    authFailMsg: '#抖音下线 仅限主人使用',
-  },
+  }
+},
+{
+  name: 'douyin:login',
+  permission: 'master',
+  authFailMsg: '#抖音bot登录 仅限主人使用',
+}
 )
