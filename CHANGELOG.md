@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/compare/v1.2.0...v1.2.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* ck 失效时零噪音下线，不注册 bot ([5e0c66c](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/commit/5e0c66cfdc250476e7f4316ef8225605e5f9b78f))
+* cookie 失效时不注册 bot（start 后主动校验 user.self，initAdapter 逐个容错） ([1b98a95](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/commit/1b98a959601bcc4ae1a1bf07ac0e0649136f88a8))
+* 修复适配器初始化失败（registerBot 包装 sendForwardMsg 时对只读 stub 赋值报错） ([f721fb1](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/commit/f721fb1969f9d81e32d0930ca0c44504b4c75ee4))
+
 ## [1.2.0](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/compare/v1.1.0...v1.2.0) (2026-10-02)
 
 
