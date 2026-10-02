@@ -1,5 +1,5 @@
 import { dir } from "./dir.js";
-import { i as initAdapter } from "./adapter-idH8Wrf2.js";
+import { i as initAdapter } from "./adapter-Bl7_aHGO.js";
 import { logger } from "node-karin";
 
 //#region src/index.ts

@@ -109,7 +109,6 @@ function createAccountManager() {
 	const build = (platformUid, session, name) => {
 		const bot = new Bot({
 			cookie: session.cookie,
-			userId: platformUid,
 			log: sdkLog
 		});
 		return {
@@ -1794,12 +1793,12 @@ async function createBot(ctx) {
 	});
 	bots.set(ctx.platformUid, bot);
 	manualStop.delete(ctx.platformUid);
-	await ctx.bot.start();
-	const info = await ctx.bot.user.self().catch(() => undefined);
-	if (!info?.uid) {
-		await ctx.bot.stop();
+	try {
+		await ctx.bot.start();
+	} catch (err) {
 		bots.delete(ctx.platformUid);
-		throw new Error(`Cookie 已失效，请重新扫码登录（${ctx.config.name || ctx.platformUid}）`);
+		const reason = err instanceof Error ? err.message : String(err);
+		throw new Error(/cookie/i.test(reason) ? `Cookie 已失效，请重新扫码登录（${ctx.config.name || ctx.platformUid}）` : reason);
 	}
 	bot.adapter.index = registerBot("webSocketClient", bot);
 	ctx.bot.user.heartbeat().catch((err) => logger.debug(`[douyin] 心跳上报失败: ${err instanceof Error ? err.message : String(err)}`));
