@@ -16,7 +16,7 @@ copyConfigSync(dir.defConfigDir, dir.ConfigDir, [".json"]);
 /**
 * @description 读取配置
 */
-const config = () => {
+const config$1 = () => {
 	try {
 		const cfg = requireFileSync(`${dir.ConfigDir}/config.json`);
 		return {
@@ -36,7 +36,7 @@ function writeConfig(cfg) {
 */
 function upsertAccount(name) {
 	if (!name) return;
-	const cfg = config();
+	const cfg = config$1();
 	const existing = cfg.accounts.find((a) => a.name === name);
 	if (existing) {
 		if (existing.enable === false) {
@@ -78,14 +78,9 @@ setTimeout(() => {
 		listeners.forEach((fn) => fn(oldCfg, newCfg));
 	}));
 }, 2e3);
-/** @description 计算新旧配置的变更摘要（人类可读） */
-function diffConfig(oldCfg, newCfg) {
+/** @description 计算账号启用状态变更摘要（新增/变更/移除） */
+function diffAccounts(oldMap, newMap) {
 	const items = [];
-	if (oldCfg.autoReadOnMatch !== newCfg.autoReadOnMatch) {
-		items.push(`匹配自动已读 ${oldCfg.autoReadOnMatch ? "开启" : "关闭"}→${newCfg.autoReadOnMatch ? "开启" : "关闭"}`);
-	}
-	const oldMap = new Map((oldCfg.accounts || []).map((a) => [a.name ?? "", a.enable !== false]));
-	const newMap = new Map((newCfg.accounts || []).map((a) => [a.name ?? "", a.enable !== false]));
 	for (const [name, enable] of newMap) {
 		if (!name) continue;
 		const prev = oldMap.get(name);
@@ -97,6 +92,17 @@ function diffConfig(oldCfg, newCfg) {
 	}
 	return items;
 }
+/** @description 计算新旧配置的变更摘要（人类可读） */
+function diffConfig(oldCfg, newCfg) {
+	const items = [];
+	if (oldCfg.autoReadOnMatch !== newCfg.autoReadOnMatch) {
+		items.push(`匹配自动已读 ${oldCfg.autoReadOnMatch ? "开启" : "关闭"}→${newCfg.autoReadOnMatch ? "开启" : "关闭"}`);
+	}
+	const oldMap = new Map((oldCfg.accounts || []).map((a) => [a.name ?? "", a.enable !== false]));
+	const newMap = new Map((newCfg.accounts || []).map((a) => [a.name ?? "", a.enable !== false]));
+	items.push(...diffAccounts(oldMap, newMap));
+	return items;
+}
 
 //#endregion
-export { onConfigChange as n, upsertAccount as r, config as t };
+export { onConfigChange as n, upsertAccount as r, config$1 as t };

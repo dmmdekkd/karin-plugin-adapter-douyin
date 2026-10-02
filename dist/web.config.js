@@ -1,5 +1,5 @@
 import { dir } from "./dir.js";
-import { t as config } from "./config-hl-8_-zX.js";
+import { t as config$1 } from "./config-DYAS3Xg8.js";
 import path from "node:path";
 import { components, defineConfig } from "node-karin";
 import fs from "node:fs";
@@ -26,7 +26,7 @@ var web_config_default = defineConfig({
 	},
 	/** 动态渲染的组件 */
 	components: () => {
-		const cfg = config();
+		const cfg = config$1();
 		return [components.accordionPro.create("accounts", (cfg.accounts || []).map((account) => ({
 			title: account.name || "未命名账号",
 			subtitle: account.enable === false ? "已停用" : "已启用",

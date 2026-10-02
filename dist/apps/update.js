@@ -1,7 +1,7 @@
 import { dir } from "../dir.js";
 import karin, { checkPkgUpdate, logger, restartDirect, updatePkg } from "node-karin";
 
-//#region src/core/update.ts
+//#region src/utils/update.ts
 /** 检查更新 返回结果文本 */
 async function checkUpdate() {
 	const result = await checkPkgUpdate(dir.name);
