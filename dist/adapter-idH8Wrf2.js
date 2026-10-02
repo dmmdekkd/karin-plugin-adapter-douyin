@@ -1793,9 +1793,15 @@ async function createBot(ctx) {
 		logger.warn(`[douyin][${ctx.platformUid}] 连接被断开（${ev.reason || ev.code || "未知原因"}），SDK 自动重连中`);
 	});
 	bots.set(ctx.platformUid, bot);
-	bot.adapter.index = registerBot("webSocketClient", bot);
 	manualStop.delete(ctx.platformUid);
 	await ctx.bot.start();
+	const info = await ctx.bot.user.self().catch(() => undefined);
+	if (!info?.uid) {
+		await ctx.bot.stop();
+		bots.delete(ctx.platformUid);
+		throw new Error(`Cookie 已失效，请重新扫码登录（${ctx.config.name || ctx.platformUid}）`);
+	}
+	bot.adapter.index = registerBot("webSocketClient", bot);
 	ctx.bot.user.heartbeat().catch((err) => logger.debug(`[douyin] 心跳上报失败: ${err instanceof Error ? err.message : String(err)}`));
 	startRefreshTimer(ctx);
 	logger.debug(`[douyin] 账号 ${ctx.platformUid}(${ctx.config.name || "未命名"}) 已上线`);
@@ -1861,7 +1867,13 @@ async function initAdapter() {
 	loadContactCache();
 	const m = getAccountManager();
 	await m.restore();
-	await Promise.all([...m.accounts.values()].map((ctx) => createBot(ctx)));
+	await Promise.all([...m.accounts.values()].map(async (ctx) => {
+		try {
+			await createBot(ctx);
+		} catch (err) {
+			logger.error(`[douyin] 账号初始化失败: ${err instanceof Error ? err.message : String(err)}`);
+		}
+	}));
 }
 /** 扫码登录并注册适配器（供指令层调用） */
 async function login$1(options = {}) {
