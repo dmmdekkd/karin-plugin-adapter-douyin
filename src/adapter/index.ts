@@ -873,13 +873,14 @@ export async function createBot (ctx: DouyinAccount): Promise<AdapterDouyin> {
 
   bots.set(ctx.platformUid, bot)
   manualStop.delete(ctx.platformUid)
-  await ctx.bot.start()
-  // cookie 有效性校验：SDK start 仅在未传 userId 时才自检，这里主动校验，ck 失效则不注册 bot
-  const info = await ctx.bot.user.self().catch(() => undefined)
-  if (!info?.uid) {
-    await ctx.bot.stop()
+  try {
+    // 未传 userId 构建时，start() 在连接 WS 前先 self() 校验 cookie；失效即 throw，不产生 cmd=203/frame/重连噪音
+    await ctx.bot.start()
+  } catch (err) {
     bots.delete(ctx.platformUid)
-    throw new Error(`Cookie 已失效，请重新扫码登录（${ctx.config.name || ctx.platformUid}）`)
+    const reason = err instanceof Error ? err.message : String(err)
+    // SDK 校验失败提示含 Cookie 字样，统一转成面向用户的提示
+    throw new Error(/cookie/i.test(reason) ? `Cookie 已失效，请重新扫码登录（${ctx.config.name || ctx.platformUid}）` : reason)
   }
   bot.adapter.index = registerBot('webSocketClient', bot)
   // im 活跃心跳上报（登录后打一次；对齐参考插件 L1150，防连接静默掉线）

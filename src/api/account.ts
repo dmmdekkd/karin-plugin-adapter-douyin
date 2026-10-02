@@ -30,7 +30,8 @@ export function createAccountManager (): AccountManager {
   const accounts: AccountMap = new Map()
 
   const build = (platformUid: string, session: Session, name?: string): DouyinAccount => {
-    const bot = new Bot({ cookie: session.cookie, userId: platformUid, log: sdkLog })
+    // 不传 userId：SDK start() 会在创建 Im/连接 WS 之前先 self() 校验 cookie，失效直接 throw（零噪音）
+    const bot = new Bot({ cookie: session.cookie, log: sdkLog })
     return { platformUid, config: { name }, bot }
   }
 
