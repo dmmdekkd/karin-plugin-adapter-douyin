@@ -1,4 +1,4 @@
-import { n as getAccountManager, r as getBots, t as destroyBot } from "../adapter-Ctuk4Whh.js";
+import { n as getAccountManager, r as getBots, t as destroyBot } from "../adapter-DLTqWjAK.js";
 import karin from "node-karin";
 
 //#region src/apps/account.ts

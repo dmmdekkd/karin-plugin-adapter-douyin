@@ -1716,7 +1716,11 @@ function unsupported(method) {
 	throw new Error(`[douyin] 抖音平台不支持: ${method}`);
 }
 for (const name of UNSUPPORTED) {
-	Object.defineProperty(AdapterDouyin.prototype, name, { value: () => unsupported(name) });
+	Object.defineProperty(AdapterDouyin.prototype, name, {
+		value: () => unsupported(name),
+		writable: true,
+		configurable: true
+	});
 }
 /** 已注册 bot 索引：platformUid → 适配器实例 */
 const bots = new Map();

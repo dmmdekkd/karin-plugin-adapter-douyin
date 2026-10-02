@@ -1,4 +1,4 @@
-import { a as login } from "../adapter-Ctuk4Whh.js";
+import { a as login } from "../adapter-DLTqWjAK.js";
 import karin, { hooks, logger, segment } from "node-karin";
 import QRCode from "qrcode";
 
