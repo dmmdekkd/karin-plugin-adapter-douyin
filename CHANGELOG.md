@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/compare/v1.1.0...v1.2.0) (2026-10-02)
+
+
+### Features
+
+* 完善抖音适配器功能（status 群成员变更补漏、SDK 独有能力透传、账号管理指令、登录心跳上报） ([c1bd927](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/commit/c1bd927f70beb8669ce7f1e6dbf8cabdf80e4b19))
+
 ## [1.0.0](https://github.com/dmmdekkd/karin-plugin-adapter-douyin/compare/v1.0.0...v1.0.0) (2026-09-17)
 
 
