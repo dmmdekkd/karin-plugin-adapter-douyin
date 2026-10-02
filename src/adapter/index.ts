@@ -779,8 +779,14 @@ function unsupported (method: string): never {
 }
 
 // 批量绑定不支持的接口方法（不再逐个手写 stub）
+// writable/configurable 必须为 true：node-karin registerBot 会对 sendMsg/sendForwardMsg 等做钩子包装赋值，
+// 若为只读属性会抛 "Cannot assign to read only property" 导致注册失败
 for (const name of UNSUPPORTED) {
-  Object.defineProperty(AdapterDouyin.prototype, name, { value: (): never => unsupported(name) })
+  Object.defineProperty(AdapterDouyin.prototype, name, {
+    value: (): never => unsupported(name),
+    writable: true,
+    configurable: true,
+  })
 }
 
 /** 已注册 bot 索引：platformUid → 适配器实例 */
